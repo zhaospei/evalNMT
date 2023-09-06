@@ -6,6 +6,18 @@ from pycocoevalcap.rouge.rouge import Rouge
 from pycocoevalcap.cider.cider import Cider
 from pycocoevalcap.bleu.bleu import Bleu 
 
+
+def calc_recall(pred, tgt):
+    prds = pred.split()
+    tgs = tgt.split()
+    count = 0
+
+    for prd in prds:
+        if prd in tgs:
+            count += 1
+    return count / len(tgs)
+
+
 def calc_prec(pred, tgt):
     prds = pred.split()
     tgs = tgt.split()
@@ -35,14 +47,19 @@ def cal_metrics(prd_dir, gold_dir, has_index):
     
     EM = list()
     precs = list()
+    recalls = list()
     for i, (ref, gold) in enumerate(zip(predictions, golds)):
         EM.append(ref.split() == gold.split())
-        precs.append(calc_prec(ref,gold))
+        precs.append(calc_prec(ref, gold))
+        recalls.append(calc_recall(ref, gold))
+
     EM = round(np.mean(EM)*100, 3)
     precs = round(np.mean(precs)*100, 3)
+    recalls = round(np.mean(recalls) * 100, 3)
 
     print("EM = %s" % (str(EM)))
     print("precs = %s" % (str(precs)))
+    print("recalls = %s" % (str(recalls)))
 
     res = {k: [' '.join(v.split('\t')[1:]).strip().lower()] for k, v in enumerate(predictions)}
     tgt = {k: [' '.join(v.split('\t')[1:]).strip().lower()] for k, v in enumerate(golds)}
@@ -56,7 +73,7 @@ def cal_metrics(prd_dir, gold_dir, has_index):
     print("ROUGE-L: %s" % (float(score_Rouge)*100))
 
     score_Bleu, scores_Bleu = Bleu().compute_score(tgt, res)
-    print("Bleu: %s" % (float(score_Bleu[3])*100))
+    print("Bleu (1/2/3/4): %s %s %s %s" % (float(score_Bleu[0])*100, float(score_Bleu[1])*100,  float(score_Bleu[2])*100, float(score_Bleu[3])*100))
 
     os.remove(tmp_file)
 
