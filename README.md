@@ -10,3 +10,5 @@ Compute the **BLUE-4**, **METEOR** and **ROUGE-L** score by running the script `
 ```bash
 ./score.sh REFERENCE PREDICTION
 ```
+
+psutil
