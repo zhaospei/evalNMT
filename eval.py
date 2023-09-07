@@ -47,19 +47,19 @@ def cal_metrics(prd_dir, gold_dir, has_index):
     
     EM = list()
     precs = list()
-    recalls = list()
+    recall = list()
     for i, (ref, gold) in enumerate(zip(predictions, golds)):
         EM.append(ref.split() == gold.split())
         precs.append(calc_prec(ref, gold))
-        recalls.append(calc_recall(ref, gold))
+        recall.append(calc_recall(ref, gold))
 
     EM = round(np.mean(EM)*100, 3)
     precs = round(np.mean(precs)*100, 3)
-    recalls = round(np.mean(recalls) * 100, 3)
+    recall = round(np.mean(recall) * 100, 3)
 
     print("EM = %s" % (str(EM)))
     print("precs = %s" % (str(precs)))
-    print("recalls = %s" % (str(recalls)))
+    print("recall = %s" % (str(recall)))
 
     res = {k: [' '.join(v.split('\t')[1:]).strip().lower()] for k, v in enumerate(predictions)}
     tgt = {k: [' '.join(v.split('\t')[1:]).strip().lower()] for k, v in enumerate(golds)}
