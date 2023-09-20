@@ -4,8 +4,9 @@ import numpy as np
 from pycocoevalcap.meteor.meteor import Meteor
 from pycocoevalcap.rouge.rouge import Rouge
 from pycocoevalcap.cider.cider import Cider
-from pycocoevalcap.bleu.bleu import Bleu 
-
+# from pycocoevalcap.bleu.bleu import Bleu
+from pycocoevalcap.bleu.bleu_b_norm import computeMaps, bleuFromMaps
+import bleu
 
 def calc_recall(pred, tgt):
     prds = pred.split()
@@ -57,23 +58,47 @@ def cal_metrics(prd_dir, gold_dir, has_index):
     precs = round(np.mean(precs)*100, 3)
     recall = round(np.mean(recall) * 100, 3)
 
-    print("EM = %s" % (str(EM)))
-    print("precs = %s" % (str(precs)))
-    print("recall = %s" % (str(recall)))
-
     res = {k: [' '.join(v.split('\t')[1:]).strip().lower()] for k, v in enumerate(predictions)}
     tgt = {k: [' '.join(v.split('\t')[1:]).strip().lower()] for k, v in enumerate(golds)}
     
     # precision 1-gram
-    print(len(res))
-    print(len(tgt))
-    score_Meteor, scores_Meteor = Meteor().compute_score(tgt, res)
-    print("Meteor: %s" % (float(score_Meteor)*100))
+    print("predict lines: ", len(res))
+    print("refs lines: ", len(tgt))
+
+    print("EM = %s" % (str(EM)))
+    print("precs = %s" % (str(precs)))
+    print("recall = %s" % (str(recall)))
+    # score_Meteor, scores_Meteor = Meteor().compute_score(tgt, res)
+    # print("Meteor: %s" % (float(score_Meteor)*100))
     score_Rouge, scores_Rouge = Rouge().compute_score(tgt, res)
     print("ROUGE-L: %s" % (float(score_Rouge)*100))
 
-    score_Bleu, scores_Bleu = Bleu().compute_score(tgt, res)
-    print("Bleu (1/2/3/4): %s %s %s %s" % (float(score_Bleu[0])*100, float(score_Bleu[1])*100,  float(score_Bleu[2])*100, float(score_Bleu[3])*100))
+    (goldMap, predictionMap) = bleu.computeMaps(predictions, tmp_file)
+    dev_bleu = round(bleu.bleuFromMaps(goldMap, predictionMap)[0], 3)
+    (goldMap2, predictionMap2) = bleu.computeMaps(predictions, tmp_file)
+    dev_bleu2 = round(bleu.bleuFromMaps(goldMap2, predictionMap2)[0], 3)
+    print("  %s = %s " % ("bleu-4", str(dev_bleu)))
+    print("  %s = %s " % ("bleu-normal", str(dev_bleu2)))
+
+    # ref_sentence_lst = [x.strip() for x in open(sys.argv[1]) if x.strip()]
+    
+    # # with open("tmp_ref.txt","w") as f:
+    # #   for idx, ref_sentence in enumerate(ref_sentence_lst):
+    # #     f.write("{}\t{}\n".format(idx, ref_sentence))
+    
+    # with open("tmp_ref.txt","w") as f:
+    #     for refs in ref_sentence_lst:
+    #     idx, ref_sentence = refs.split('\t')
+    #     f.write("{}\t{}\n".format(idx, ref_sentence))
+
+    # reference_file = "tmp_ref.txt"
+    # predictions = []
+    # for row in sys.stdin:
+    #     idx, sent = row.split('\t')
+    #     predictions.append("{}\t{}".format(idx,sent))
+    
+    (goldMap, predictionMap) = computeMaps(predictions, tmp_file) 
+    print ("Bleu-B-Norm: ", bleuFromMaps(goldMap, predictionMap)[0])
 
     os.remove(tmp_file)
 
