@@ -68,8 +68,8 @@ def cal_metrics(prd_dir, gold_dir, has_index):
     print("EM = %s" % (str(EM)))
     print("precs = %s" % (str(precs)))
     print("recall = %s" % (str(recall)))
-    # score_Meteor, scores_Meteor = Meteor().compute_score(tgt, res)
-    # print("Meteor: %s" % (float(score_Meteor)*100))
+    score_Meteor, scores_Meteor = Meteor().compute_score(tgt, res)
+    print("Meteor: %s" % (float(score_Meteor)*100))
     score_Rouge, scores_Rouge = Rouge().compute_score(tgt, res)
     print("ROUGE-L: %s" % (float(score_Rouge)*100))
 
