@@ -28,20 +28,24 @@ def calc_prec(pred, tgt):
             count += 1
     return count/ len(prds)
 
-def cal_metrics(prd_dir, gold_dir, has_index):
+def cal_metrics(prd_dir, gold_dir, prd_index, gold_index):
     predictions = list()
     golds = list()
     
-    if has_index:
+    if prd_index:
         with open(prd_dir) as f:
             predictions =  [line.strip() for line in f.readlines()]
-        with open(gold_dir) as f:
-            golds =  [line.strip() for line in f.readlines()]
     else:
         with open(prd_dir) as f:
             predictions =  [str(i)+ '\t' + line.strip() for i, line in enumerate(f.readlines())]
+
+    if gold_index:
+        with open(gold_dir) as f:
+            golds =  [line.strip() for line in f.readlines()]
+    else:
         with open(gold_dir) as f:
             golds =  [str(i)+ '\t' + line.strip() for i, line in enumerate(f.readlines())]
+        
     tmp_file = 'tmpgold.txt'
     with open(tmp_file,'w+') as f:
         f.write('\n'.join(golds))
@@ -108,12 +112,14 @@ def main():
                         help="File dir to read predict msg")
     parser.add_argument("--gold_dir", default=None, type=str,
                         help="File dir to read gold msg")
-    parser.add_argument("--has_index", action='store_true',
-                        help="Contain index line in file")
+    parser.add_argument("--prd_index", action='store_true',
+                        help="Contain index line in file predict")
+    parser.add_argument("--gold_index", action='store_true',
+                        help="Contain index line in file gold")
     
     args = parser.parse_args()
 
-    cal_metrics(args.prd_dir, args.gold_dir, args.has_index)
+    cal_metrics(args.prd_dir, args.gold_dir, args.prd_index, args.gold_index)
 
 if __name__ == "__main__":
     main()
