@@ -16,4 +16,6 @@ Compute the **BLUE-4**, **METEOR** and **ROUGE-L** score by running `eval.py` wi
 python3 eval.py --prd_dir data/nngen.codisum.test.msg --gold_dir data/codisum.test.msg 
 ```
 
+If your predict file or gold file already have index, you can choose option --prd_index and --gold_index instead.
+
 
