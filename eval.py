@@ -1,110 +1,103 @@
-import os
-import argparse
+#!/usr/bin/env python
+# !-*-coding:utf-8 -*-
+import json
 import numpy as np
-from pycocoevalcap.meteor.meteor import Meteor
-from pycocoevalcap.rouge.rouge import Rouge
-from pycocoevalcap.cider.cider import Cider
-# from pycocoevalcap.bleu.bleu import Bleu
-from pycocoevalcap.bleu.bleu_b_norm import computeMaps, bleuFromMaps
-import bleu
+import sys
+
+sys.path.append("metric")
+from metric.smooth_bleu import codenn_smooth_bleu
+from metric.meteor.meteor import Meteor
+from metric.rouge.rouge import Rouge
+from metric.cider.cider import Cider
+import warnings
+import argparse
+import logging
+import prettytable as pt
+
+warnings.filterwarnings('ignore')
+logging.basicConfig(format='[%(asctime)s - %(levelname)s - %(name)s] %(message)s',
+                    datefmt='%m/%d/%Y %H:%M:%S',
+                    level=logging.INFO)
 
 def calc_recall(pred, tgt):
-    prds = pred.split()
-    tgs = tgt.split()
     count = 0
-
-    for prd in prds:
-        if prd in tgs:
+    for prd in pred:
+        if prd in tgt:
             count += 1
-    return count / len(tgs)
+    return count / len(tgt)
 
 
 def calc_prec(pred, tgt):
-    prds = pred.split()
-    tgs = tgt.split()
     count = 0 
-    for prd in prds:
-        if prd in tgs:
+    for prd in pred:
+        if prd in tgt:
             count += 1
-    return count/ len(prds)
+    return count / len(pred)
 
-def cal_metrics(prd_dir, gold_dir, prd_index, gold_index):
-    predictions = list()
-    golds = list()
+def em_prec_recall(refs, preds):
+    EM = []
+    prec = []
+    recall = []
+
+    for r, p in zip(refs, preds):
+        EM.append(r[0] == p)
+        prec.append(calc_prec(p, r[0]))
+        recall.append(calc_recall(p, r[0]))
     
-    if prd_index:
-        with open(prd_dir) as f:
-            predictions =  [line.strip() for line in f.readlines()]
-    else:
-        with open(prd_dir) as f:
-            predictions =  [str(i)+ '\t' + line.strip() for i, line in enumerate(f.readlines())]
+    print("EM: ", round(np.mean(EM)*100, 2))
+    print("Precision: ", round(np.mean(prec)*100, 2))
+    print("Recall: ", round(np.mean(recall) * 100, 2))
 
-    if gold_index:
-        with open(gold_dir) as f:
-            golds =  [line.strip() for line in f.readlines()]
-    else:
-        with open(gold_dir) as f:
-            golds =  [str(i)+ '\t' + line.strip() for i, line in enumerate(f.readlines())]
+
+def Commitbleus(refs, preds):
+
+    r_str_list = []
+    p_str_list = []
+    for r, p in zip(refs, preds):
+        if len(r[0]) == 0 or len(p) == 0:
+            continue
+        r_str_list.append([" ".join([str(token_id) for token_id in r[0]])])
+        p_str_list.append(" ".join([str(token_id) for token_id in p]))
+    try:
+        bleu_list = codenn_smooth_bleu(r_str_list, p_str_list)
+    except:
+        bleu_list = [0, 0, 0, 0]
+    codenn_bleu = bleu_list[0]
+
+    B_Norm = round(codenn_bleu, 4)
+
+    return B_Norm
+
+
+def read_to_list(filename, index):
+    f = open(filename, 'r',encoding="utf-8")
+    res = []
+    for row in f:
+        if index:
+            (rid, text) = row.split('\t')
+            res.append(text.lower().split())
+        else:
+            res.append(row.lower().split())
+    return res
+
+def metetor_rouge_cider(refs, preds):
+
+    refs_dict = {}
+    preds_dict = {}
+    for i in range(len(preds)):
+        preds_dict[i] = [" ".join(preds[i])]
+        refs_dict[i] = [" ".join(refs[i][0])]
         
-    tmp_file = 'tmpgold.txt'
-    with open(tmp_file,'w+') as f:
-        f.write('\n'.join(golds))
-    
-    EM = list()
-    precs = list()
-    recall = list()
-    for i, (ref, gold) in enumerate(zip(predictions, golds)):
-        EM.append(ref.split() == gold.split())
-        precs.append(calc_prec(ref, gold))
-        recall.append(calc_recall(ref, gold))
+    score_Meteor, scores_Meteor = Meteor().compute_score(refs_dict, preds_dict)
+    print("Meteor: ", round(score_Meteor*100,2))
 
-    EM = round(np.mean(EM)*100, 3)
-    precs = round(np.mean(precs)*100, 3)
-    recall = round(np.mean(recall) * 100, 3)
+    score_Rouge, scores_Rouge = Rouge().compute_score(refs_dict, preds_dict)
+    print("Rouge-L: ", round(score_Rouge*100,2))
 
-    res = {k: [' '.join(v.split('\t')[1:]).strip().lower()] for k, v in enumerate(predictions)}
-    tgt = {k: [' '.join(v.split('\t')[1:]).strip().lower()] for k, v in enumerate(golds)}
-    
-    # precision 1-gram
-    print("predict lines: ", len(res))
-    print("refs lines: ", len(tgt))
+    score_Cider, scores_Cider = Cider().compute_score(refs_dict, preds_dict)
+    print("Cider: ",round(score_Cider,2))
 
-    print("EM = %s" % (str(EM)))
-    print("precs = %s" % (str(precs)))
-    print("recall = %s" % (str(recall)))
-    score_Meteor, scores_Meteor = Meteor().compute_score(tgt, res)
-    print("Meteor: %s" % (float(score_Meteor)*100))
-    score_Rouge, scores_Rouge = Rouge().compute_score(tgt, res)
-    print("ROUGE-L: %s" % (float(score_Rouge)*100))
 
-    (goldMap, predictionMap) = bleu.computeMaps(predictions, tmp_file)
-    dev_bleu = round(bleu.bleuFromMaps(goldMap, predictionMap)[0], 3)
-    (goldMap2, predictionMap2) = bleu.computeMaps(predictions, tmp_file)
-    dev_bleu2 = round(bleu.bleuFromMaps(goldMap2, predictionMap2)[0], 3)
-    print("  %s = %s " % ("bleu-4", str(dev_bleu)))
-    print("  %s = %s " % ("bleu-normal", str(dev_bleu2)))
-
-    # ref_sentence_lst = [x.strip() for x in open(sys.argv[1]) if x.strip()]
-    
-    # # with open("tmp_ref.txt","w") as f:
-    # #   for idx, ref_sentence in enumerate(ref_sentence_lst):
-    # #     f.write("{}\t{}\n".format(idx, ref_sentence))
-    
-    # with open("tmp_ref.txt","w") as f:
-    #     for refs in ref_sentence_lst:
-    #     idx, ref_sentence = refs.split('\t')
-    #     f.write("{}\t{}\n".format(idx, ref_sentence))
-
-    # reference_file = "tmp_ref.txt"
-    # predictions = []
-    # for row in sys.stdin:
-    #     idx, sent = row.split('\t')
-    #     predictions.append("{}\t{}".format(idx,sent))
-    
-    (goldMap, predictionMap) = computeMaps(predictions, tmp_file) 
-    print ("Bleu-B-Norm: ", bleuFromMaps(goldMap, predictionMap)[0])
-
-    os.remove(tmp_file)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -113,13 +106,20 @@ def main():
     parser.add_argument("--gold_dir", default=None, type=str,
                         help="File dir to read gold msg")
     parser.add_argument("--prd_index", action='store_true',
-                        help="Contain index line in file predict")
+                        help="Contain row id in file predict lines")
     parser.add_argument("--gold_index", action='store_true',
-                        help="Contain index line in file gold")
-    
+                        help="Contain row id in file gold lines")
     args = parser.parse_args()
+    refs = read_to_list(args.gold_dir, args.gold_index)
+    refs = [[t] for t in refs]
+    preds = read_to_list(args.prd_dir, args.prd_index)
+    bleus_score = Commitbleus(refs, preds)
+    print("Refs: ", len(refs))
+    print("Preds: ", len(preds))
+    print("BLEU: %.2f"%bleus_score)
+    metetor_rouge_cider(refs, preds)
+    em_prec_recall(refs, preds)
 
-    cal_metrics(args.prd_dir, args.gold_dir, args.prd_index, args.gold_index)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
